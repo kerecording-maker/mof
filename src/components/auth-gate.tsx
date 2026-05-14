@@ -8,16 +8,39 @@ import { getFirebaseAuth, signInWithGoogle } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { cn } from "@/lib/utils";
 
-const shellBg =
-  "min-h-dvh bg-gradient-to-b from-primary/[0.06] via-background to-muted/30 dark:from-primary/[0.12] dark:via-background dark:to-muted/20";
+/** Full-bleed login backdrop (override with `VITE_LOGIN_BG_URL` in `.env`). */
+const LOGIN_BG_URL =
+  (import.meta.env.VITE_LOGIN_BG_URL as string | undefined) ||
+  "https://i.ibb.co/dsvWJhgn/Gemini-Generated-Image-heqti6heqti6heqt.png";
+
+function LoginBackdrop() {
+  return (
+    <>
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: `url(${LOGIN_BG_URL})` }}
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-gradient-to-b from-background/75 via-background/45 to-background/85 dark:from-background/85 dark:via-background/50 dark:to-background/92"
+      />
+    </>
+  );
+}
 
 function AuthLoading() {
   return (
-    <div className={cn(shellBg, "flex flex-col items-center justify-center gap-4 px-4")}>
-      <Loader2 className="size-10 animate-spin text-primary" aria-hidden />
-      <p className="text-sm text-muted-foreground">Checking your session…</p>
+    <div className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden px-4">
+      <LoginBackdrop />
+      <Loader2
+        className="relative z-10 size-10 animate-spin text-primary drop-shadow-md"
+        aria-hidden
+      />
+      <p className="relative z-10 text-sm text-foreground/90 drop-shadow">
+        Checking your session…
+      </p>
     </div>
   );
 }
@@ -35,22 +58,15 @@ function LoginScreen({ onGoogleSignIn }: { onGoogleSignIn: () => Promise<void> }
   };
 
   return (
-    <div className={cn(shellBg, "relative flex min-h-dvh flex-col")}>
-      <div
-        className="pointer-events-none absolute inset-0 overflow-hidden"
-        aria-hidden
-      >
-        <div className="absolute -left-24 top-1/4 size-72 rounded-full bg-cyan-500/10 blur-3xl dark:bg-cyan-400/8" />
-        <div className="absolute -right-16 bottom-1/4 size-64 rounded-full bg-emerald-500/10 blur-3xl dark:bg-emerald-400/8" />
-        <div className="absolute left-1/2 top-12 size-48 -translate-x-1/2 rounded-full bg-orange-500/8 blur-2xl dark:bg-orange-400/6" />
-      </div>
+    <div className="relative flex min-h-dvh flex-col overflow-hidden">
+      <LoginBackdrop />
 
-      <header className="relative z-10 flex justify-end border-b border-border/50 bg-card/40 px-4 py-3 backdrop-blur-sm">
+      <header className="relative z-10 flex justify-end border-b border-white/10 bg-black/25 px-4 py-3 backdrop-blur-md dark:border-white/5 dark:bg-black/35">
         <ThemeToggle />
       </header>
 
       <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-4 pb-16 pt-8">
-        <Card className="w-full max-w-md border-border/80 shadow-xl shadow-cyan-950/10 dark:border-cyan-500/20 dark:shadow-cyan-950/30">
+        <Card className="w-full max-w-md border-border/60 bg-card/90 shadow-2xl shadow-black/25 backdrop-blur-md dark:border-white/10 dark:bg-card/85 dark:shadow-black/50">
           <CardHeader className="space-y-6 text-center">
             <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary/80 text-xl font-bold text-primary-foreground shadow-lg">
               F

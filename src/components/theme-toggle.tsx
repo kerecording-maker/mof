@@ -5,11 +5,8 @@ import { Button } from "@/components/ui/button";
 export const THEME_STORAGE_KEY = "mof-theme";
 
 function subscribe(onStoreChange: () => void) {
-  const mq = window.matchMedia("(prefers-color-scheme: dark)");
-  mq.addEventListener("change", onStoreChange);
   window.addEventListener("mof-theme", onStoreChange);
   return () => {
-    mq.removeEventListener("change", onStoreChange);
     window.removeEventListener("mof-theme", onStoreChange);
   };
 }
