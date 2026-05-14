@@ -76,7 +76,7 @@ function LoginScreen({ onGoogleSignIn }: { onGoogleSignIn: () => Promise<void> }
                 Federal Budget Tagging
               </CardTitle>
               <CardDescription className="text-base text-muted-foreground">
-                Climate Finance Dashboard · 2024–25
+                Finance Dashboard · 2024–25
               </CardDescription>
             </div>
           </CardHeader>
