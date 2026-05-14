@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import type { User } from "firebase/auth";
-import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 import { toast } from "sonner";
 import { LogIn } from "lucide-react";
 
-import { getFirebaseAuth, googleAuthProvider } from "@/lib/firebase";
+import { getFirebaseAuth, signInWithGoogle } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -31,7 +31,7 @@ export function GoogleAuthButton() {
 
   const signIn = async () => {
     try {
-      await signInWithPopup(getFirebaseAuth(), googleAuthProvider);
+      await signInWithGoogle();
       toast.success("Signed in with Google");
     } catch (e) {
       console.error(e);

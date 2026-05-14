@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, type Auth } from "firebase/auth";
+import { getAuth, GoogleAuthProvider, signInWithPopup, type Auth } from "firebase/auth";
 
 /**
  * Prefer `VITE_FIREBASE_*` in `.env` for deployments. Fallbacks match the MOF dashboard Firebase project.
@@ -30,3 +30,7 @@ export function getFirebaseAuth(): Auth {
 }
 
 export const googleAuthProvider = new GoogleAuthProvider();
+
+export function signInWithGoogle() {
+  return signInWithPopup(getFirebaseAuth(), googleAuthProvider);
+}

@@ -691,12 +691,12 @@ export function CompareModuleModal({
               </div>
             </div>
 
-            {/* Center — column selection */}
-            <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col gap-3 md:max-w-md lg:max-w-lg">
+            {/* Center — column selection (fixed width so labels + subtitle are not squeezed) */}
+            <div className="flex min-h-0 w-full flex-col gap-3 md:h-full md:w-[min(22rem,92vw)] md:max-w-[min(22rem,92vw)] md:shrink-0 md:flex-none">
               <Card className="border-border/80 shadow-sm">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm">Columns to compare</CardTitle>
-                  <CardDescription className="text-xs">
+                  <CardDescription className="text-xs leading-snug text-pretty">
                     Multi-select metrics (matched by header keywords).
                   </CardDescription>
                 </CardHeader>
@@ -704,13 +704,14 @@ export function CompareModuleModal({
                   {COMPARE_CANONICAL.map((col) => (
                     <label
                       key={col.id}
-                      className="flex cursor-pointer items-center gap-2 rounded-md border border-transparent px-2 py-1.5 hover:bg-muted/60"
+                      className="flex cursor-pointer items-center gap-2.5 rounded-md border border-transparent px-2 py-1.5 hover:bg-muted/60"
                     >
                       <Checkbox
+                        className="shrink-0"
                         checked={!!selected[col.id]}
                         onCheckedChange={(v) => toggleCol(col.id, v === true)}
                       />
-                      <span className="text-sm">{col.label}</span>
+                      <span className="min-w-0 flex-1 text-sm leading-snug">{col.label}</span>
                     </label>
                   ))}
                 </CardContent>
