@@ -79,32 +79,16 @@ const fullScreenDialogClass =
   "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 sm:rounded-none";
 
 function Dashboard() {
-  const { entries, classifications, loaded, load, add } = useBudgetStore();
-  const [year, setYear] = useState("all");
-  const [fund, setFund] = useState("all");
-  const [ccType, setCcType] = useState("all");
-  const [relevance, setRelevance] = useState("all");
-  const [q, setQ] = useState("");
+  const { entries, classifications, loaded, load, add, filters, setFilter, getFilteredEntries } =
+    useBudgetStore();
+  const { year, fund, ccType, relevance, q } = filters;
   const [ccModalOpen, setCcModalOpen] = useState(false);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const filtered = useMemo(
-    () =>
-      entries.filter(
-        (e) =>
-          (year === "all" || String(e.year) === year) &&
-          (fund === "all" || e.description === fund) &&
-          (ccType === "all" || e.ccType === ccType) &&
-          (relevance === "all" || e.ccRelevance === relevance) &&
-          (!q ||
-            e.costCenter?.toLowerCase().includes(q.toLowerCase()) ||
-            e.ddoCode?.toLowerCase().includes(q.toLowerCase())),
-      ),
-    [entries, year, fund, ccType, relevance, q],
-  );
+  const filtered = useMemo(() => getFilteredEntries(), [getFilteredEntries, entries, filters]);
 
   const years = useMemo(() => [...new Set(entries.map((e) => e.year))].sort(), [entries]);
   const funds = useMemo(
@@ -274,7 +258,7 @@ function Dashboard() {
                   <Search className="absolute left-2 top-2.5 size-4 text-muted-foreground" />
                   <Input
                     value={q}
-                    onChange={(e) => setQ(e.target.value)}
+                    onChange={(e) => setFilter("q", e.target.value)}
                     placeholder="e.g. KA9638"
                     className="pl-8"
                   />
@@ -283,20 +267,25 @@ function Dashboard() {
               <FilterSelect
                 label="Year"
                 value={year}
-                onChange={setYear}
+                onChange={(v) => setFilter("year", v)}
                 options={years.map(String)}
               />
               <FilterSelect
                 label="Division / Fund"
                 value={fund}
-                onChange={setFund}
+                onChange={(v) => setFilter("fund", v)}
                 options={funds}
               />
-              <FilterSelect label="CC Type" value={ccType} onChange={setCcType} options={ccTypes} />
+              <FilterSelect
+                label="CC Type"
+                value={ccType}
+                onChange={(v) => setFilter("ccType", v)}
+                options={ccTypes}
+              />
               <FilterSelect
                 label="Climate Relevance"
                 value={relevance}
-                onChange={setRelevance}
+                onChange={(v) => setFilter("relevance", v)}
                 options={["Yes", "No"]}
               />
             </CardContent>
