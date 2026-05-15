@@ -7,6 +7,7 @@ import {
   FileSpreadsheet,
   Lightbulb,
   Shield,
+  FileText,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,7 @@ import {
   CartesianGrid,
 } from "recharts";
 import { CompareModuleModal } from "@/components/compare/compare-module-modal";
+import { GenerateReportModuleModal } from "@/components/report/generate-report-module-modal";
 
 const fullScreenPanelClass =
   "fixed inset-0 left-0 top-0 z-50 flex h-[100dvh] max-h-[100dvh] w-full max-w-none translate-x-0 translate-y-0 flex-col gap-0 rounded-none border-0 bg-background p-0 duration-200 " +
@@ -57,6 +59,7 @@ export function BudgetToolsDock({ children }: { children: React.ReactNode }) {
   const [compareOpen, setCompareOpen] = useState(false);
   const [analyzeOpen, setAnalyzeOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -83,9 +86,14 @@ export function BudgetToolsDock({ children }: { children: React.ReactNode }) {
               onClick={() => setAnalyzeOpen(true)}
             />
             <SidebarTool
-              label="Upload"
+              label="Upload Document"
               icon={<Upload className="size-5" />}
               onClick={() => setUploadOpen(true)}
+            />
+            <SidebarTool
+              label="Generate Report"
+              icon={<FileText className="size-5" />}
+              onClick={() => setReportOpen(true)}
             />
           </nav>
           <div className="mt-auto flex flex-col items-center gap-1 px-1 pb-2">
@@ -101,6 +109,7 @@ export function BudgetToolsDock({ children }: { children: React.ReactNode }) {
       <CompareModuleModal open={compareOpen} onOpenChange={setCompareOpen} />
       <AnalyzeModuleModal open={analyzeOpen} onOpenChange={setAnalyzeOpen} />
       <UploadDocumentModal open={uploadOpen} onOpenChange={setUploadOpen} />
+      <GenerateReportModuleModal open={reportOpen} onOpenChange={setReportOpen} />
     </TooltipProvider>
   );
 }
