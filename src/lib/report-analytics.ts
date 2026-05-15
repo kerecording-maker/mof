@@ -59,6 +59,32 @@ export function autoRangeForPeriod(type: ReportPeriodType): { from: DateParts; t
   };
 }
 
+/** Date range aligned to years present in the cost center registry (not wall-clock today). */
+export function autoRangeForEntries(
+  entries: BudgetEntry[],
+  type: ReportPeriodType,
+): { from: DateParts; to: DateParts } {
+  const years = [...new Set(entries.map((e) => e.year))].filter(Number.isFinite).sort((a, b) => a - b);
+  if (!years.length) return autoRangeForPeriod(type);
+
+  const minY = years[0];
+  const maxY = years[years.length - 1];
+  const fullRange = {
+    from: { day: 1, month: 1, year: minY },
+    to: { day: 31, month: 12, year: maxY },
+  };
+
+  if (type === "dashboard" || years.length === 1) return fullRange;
+
+  if (type === "custom") return fullRange;
+
+  const targetYear = maxY;
+  return {
+    from: { day: 1, month: 1, year: targetYear },
+    to: { day: 31, month: 12, year: targetYear },
+  };
+}
+
 function rowInRange(
   row: unknown[],
   from: Date,
@@ -236,7 +262,7 @@ function trendFromMatrix(matrix: SheetMatrix): TrendPoint[] {
     .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }));
 }
 
-function buildDashboardKpis(entries: BudgetEntry[]): DashboardKpis {
+export function buildDashboardKpis(entries: BudgetEntry[]): DashboardKpis {
   const totalBudget = sum(entries.map((e) => e.originalBudget));
   const expenditure = sum(entries.map((e) => e.expenditure));
   const climateRelevantBudget = sum(entries.map((e) => e.relevantCCBE));
@@ -454,11 +480,15 @@ export function buildReportFromBudgetEntries(
   entries: BudgetEntry[],
   config: ReportConfig,
 ): ReportData {
-  const fromYear = config.from.year;
-  const toYear = config.to.year;
   const { department, budgetCategory, region, sector } = config.filters;
 
-  let filtered = entries.filter((e) => e.year >= fromYear && e.year <= toYear);
+  let filtered = entries;
+
+  if (!config.useDashboardView) {
+    const fromYear = config.from.year;
+    const toYear = config.to.year;
+    filtered = filtered.filter((e) => e.year >= fromYear && e.year <= toYear);
+  }
 
   if (department !== "all") {
     filtered = filtered.filter((e) => e.description === department);
@@ -471,6 +501,12 @@ export function buildReportFromBudgetEntries(
   }
   if (sector !== "all") {
     filtered = filtered.filter((e) => e.subFunction === sector);
+  }
+
+  if (!filtered.length) {
+    throw new Error(
+      "No cost centers match the selected filters. Change dashboard filters or report options and try again.",
+    );
   }
 
   const years = [...new Set(filtered.map((e) => e.year))].sort((a, b) => a - b);
@@ -601,7 +637,9 @@ export function buildReportFromBudgetEntries(
     .map(([label, v]) => ({ label, ...v }))
     .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }));
 
-  const periodLabel = `${formatDateParts(config.from)} – ${formatDateParts(config.to)}`;
+  const periodLabel = config.useDashboardView
+    ? `Dashboard snapshot · ${format(new Date(), "dd MMM yyyy HH:mm")}`
+    : `${formatDateParts(config.from)} – ${formatDateParts(config.to)}`;
   const base = {
     generatedAt: new Date(),
     periodLabel,
