@@ -33,21 +33,20 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import {
-  autoRangeForPeriod,
+  autoRangeForEntries,
+  buildDashboardKpis,
   buildReportFromBudgetEntries,
   extractFilterOptionsFromEntries,
   formatDateParts,
 } from "@/lib/report-analytics";
 import { downloadReportPdf, generateReportPdf, previewReportPdf } from "@/lib/report-pdf";
 import type { DateParts, ReportConfig, ReportData, ReportPeriodType } from "@/lib/report-types";
-import { useBudgetStore } from "@/lib/budget-store";
+import { describeDashboardFilters, useBudgetStore } from "@/lib/budget-store";
 
 const PERIOD_OPTIONS: { id: ReportPeriodType; label: string; hint: string }[] = [
-  { id: "quarterly", label: "Quarterly", hint: "Last 3 months" },
-  { id: "three_months", label: "3 Months", hint: "Rolling 3 months" },
-  { id: "six_months", label: "6 Months", hint: "Rolling 6 months" },
-  { id: "yearly", label: "Yearly", hint: "Last 12 months" },
-  { id: "custom", label: "Custom range", hint: "Pick FROM / TO" },
+  { id: "dashboard", label: "Dashboard", hint: "Live view — same filters as on screen" },
+  { id: "yearly", label: "Full year", hint: "Latest fiscal year in registry" },
+  { id: "custom", label: "Custom range", hint: "Pick year FROM / TO" },
 ];
 
 const MONTH_NAMES = [
@@ -224,10 +223,10 @@ export function GenerateReportModuleModal({
   open: boolean;
   onOpenChange: (o: boolean) => void;
 }) {
-  const { entries, load, loaded } = useBudgetStore();
-  const [periodType, setPeriodType] = useState<ReportPeriodType>("quarterly");
-  const [from, setFrom] = useState<DateParts>(() => autoRangeForPeriod("quarterly").from);
-  const [to, setTo] = useState<DateParts>(() => autoRangeForPeriod("quarterly").to);
+  const { entries, load, loaded, filters, getFilteredEntries } = useBudgetStore();
+  const [periodType, setPeriodType] = useState<ReportPeriodType>("dashboard");
+  const [from, setFrom] = useState<DateParts>(() => ({ day: 1, month: 1, year: 2023 }));
+  const [to, setTo] = useState<DateParts>(() => ({ day: 31, month: 12, year: 2023 }));
   const [department, setDepartment] = useState("all");
   const [budgetCategory, setBudgetCategory] = useState("all");
   const [region, setRegion] = useState("all");
@@ -243,16 +242,42 @@ export function GenerateReportModuleModal({
   }, [open, loaded, load]);
 
   useEffect(() => {
-    if (periodType !== "custom") {
-      const range = autoRangeForPeriod(periodType);
-      setFrom(range.from);
-      setTo(range.to);
-    }
-  }, [periodType]);
+    if (!open || !entries.length) return;
+    setDepartment(filters.fund);
+    setBudgetCategory(filters.ccType);
+    setRegion(filters.relevance);
+    setLastReport(null);
+  }, [open, entries.length, filters.fund, filters.ccType, filters.relevance]);
+
+  useEffect(() => {
+    if (!entries.length) return;
+    if (periodType === "custom") return;
+    const range = autoRangeForEntries(entries, periodType);
+    setFrom(range.from);
+    setTo(range.to);
+  }, [periodType, entries]);
+
+  useEffect(() => {
+    setLastReport(null);
+  }, [periodType, from, to, department, budgetCategory, region, sector, filters]);
+
+  const dashboardEntries = useMemo(() => getFilteredEntries(), [getFilteredEntries, entries, filters]);
+
+  const reportSourceEntries = useMemo(() => {
+    let rows = dashboardEntries;
+    if (department !== "all") rows = rows.filter((e) => e.description === department);
+    if (budgetCategory !== "all") rows = rows.filter((e) => e.ccType === budgetCategory);
+    if (region !== "all") rows = rows.filter((e) => e.ccRelevance === region);
+    if (sector !== "all") rows = rows.filter((e) => e.subFunction === sector);
+    return rows;
+  }, [dashboardEntries, department, budgetCategory, region, sector]);
+
+  const liveKpis = useMemo(() => buildDashboardKpis(reportSourceEntries), [reportSourceEntries]);
 
   const filterOptions = useMemo(() => extractFilterOptionsFromEntries(entries), [entries]);
+  const dashboardFilterLabel = describeDashboardFilters(filters);
   const entryCountLabel = loaded
-    ? `${entries.length.toLocaleString()} cost center entries · ${new Set(entries.map((e) => e.description)).size} divisions`
+    ? `${reportSourceEntries.length.toLocaleString()} rows in this report · ${dashboardFilterLabel}`
     : "Loading cost center registry…";
 
   const buildConfig = useCallback((): ReportConfig => {
@@ -263,6 +288,7 @@ export function GenerateReportModuleModal({
       sheetName: "",
       reportTitle: "Cost Center Budget Report",
       filters: { department, budgetCategory, region, sector },
+      useDashboardView: periodType === "dashboard",
     };
   }, [periodType, from, to, department, budgetCategory, region, sector]);
 
@@ -271,22 +297,21 @@ export function GenerateReportModuleModal({
     if (!entries.length) {
       throw new Error("Dashboard data not loaded");
     }
-    setProgressLabel("Reading cost center registry…");
-    setProgress(15);
-    await new Promise((r) => setTimeout(r, 180));
-    setProgressLabel("Running statistical analysis…");
-    setProgress(45);
-    await new Promise((r) => setTimeout(r, 220));
-    const data = buildReportFromBudgetEntries(entries, config);
-    setProgressLabel("Building charts & AI insights…");
-    setProgress(75);
-    await new Promise((r) => setTimeout(r, 180));
-    setProgressLabel("Rendering A4 PDF…");
-    setProgress(92);
-    await new Promise((r) => setTimeout(r, 120));
+    if (!reportSourceEntries.length) {
+      throw new Error(
+        "No cost centers match your current filters. Adjust dashboard or report filters, then try again.",
+      );
+    }
+    setProgressLabel("Reading live dashboard data…");
+    setProgress(25);
+    const data = buildReportFromBudgetEntries(reportSourceEntries, config);
+    setProgressLabel("Building charts & insights…");
+    setProgress(70);
+    setProgressLabel("Rendering PDF…");
+    setProgress(95);
     setProgress(100);
     return data;
-  }, [buildConfig, entries]);
+  }, [buildConfig, entries.length, reportSourceEntries]);
 
   const handleGenerate = async () => {
     setGenerating(true);
@@ -298,7 +323,8 @@ export function GenerateReportModuleModal({
       toast.success("AI budget report generated and downloaded");
     } catch (e) {
       console.error(e);
-      toast.error("Could not generate report. Wait for dashboard data to load, then try again.");
+      const msg = e instanceof Error ? e.message : "Could not generate report.";
+      toast.error(msg);
     } finally {
       setGenerating(false);
       setProgress(0);
@@ -310,13 +336,14 @@ export function GenerateReportModuleModal({
     setGenerating(true);
     setProgress(0);
     try {
-      const data = lastReport ?? (await runAnalysis());
+      const data = await runAnalysis();
       setLastReport(data);
       previewReportPdf(data);
       setSummaryOpen(true);
     } catch (e) {
       console.error(e);
-      toast.error("Preview failed");
+      const msg = e instanceof Error ? e.message : "Preview failed";
+      toast.error(msg);
     } finally {
       setGenerating(false);
       setProgress(0);
@@ -325,25 +352,32 @@ export function GenerateReportModuleModal({
   };
 
   const handleShare = async () => {
-    if (!lastReport) {
-      toast.message("Generate a report first");
-      return;
-    }
-    const blob = generateReportPdf(lastReport);
-    const file = new File([blob], `MOF_Report.pdf`, { type: "application/pdf" });
-    if (navigator.share && navigator.canShare?.({ files: [file] })) {
-      try {
-        await navigator.share({
-          title: "MOF Budget Report",
-          text: lastReport.executiveSummary.slice(0, 120),
-          files: [file],
-        });
-      } catch {
-        toast.message("Share cancelled");
+    setGenerating(true);
+    try {
+      const data = await runAnalysis();
+      setLastReport(data);
+      const blob = generateReportPdf(data);
+      const file = new File([blob], `MOF_Report.pdf`, { type: "application/pdf" });
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        try {
+          await navigator.share({
+            title: "MOF Budget Report",
+            text: data.executiveSummary.slice(0, 120),
+            files: [file],
+          });
+        } catch {
+          toast.message("Share cancelled");
+        }
+      } else {
+        downloadReportPdf(data);
+        toast.success("PDF downloaded — attach to email to share");
       }
-    } else {
-      downloadReportPdf(lastReport);
-      toast.success("PDF downloaded — attach to email to share");
+    } catch (e) {
+      console.error(e);
+      const msg = e instanceof Error ? e.message : "Share failed";
+      toast.error(msg);
+    } finally {
+      setGenerating(false);
     }
   };
 
@@ -357,8 +391,8 @@ export function GenerateReportModuleModal({
               Generate AI Budget Report
             </DialogTitle>
             <DialogDescription className="text-sm">
-              Report is built from your dashboard cost center registry — same totals, top cost
-              centers, divisions, and climate tags as on screen.
+              Reports use live dashboard data — current filters, KPIs, and totals refresh every time
+              you generate.
             </DialogDescription>
           </DialogHeader>
 
@@ -384,6 +418,9 @@ export function GenerateReportModuleModal({
               progress={progress}
               progressLabel={progressLabel}
               lastReport={lastReport}
+              liveKpis={liveKpis}
+              reportRowCount={reportSourceEntries.length}
+              dashboardFilterLabel={dashboardFilterLabel}
             />
           </ScrollArea>
 
@@ -405,7 +442,7 @@ export function GenerateReportModuleModal({
                 variant="outline"
                 size="sm"
                 className="gap-1.5"
-                disabled={generating || !lastReport}
+                disabled={generating}
                 onClick={() => void handleShare()}
               >
                 <Share2 className="size-4" />
@@ -475,6 +512,9 @@ function ReportFormBody(props: {
   progress: number;
   progressLabel: string;
   lastReport: ReportData | null;
+  liveKpis: ReturnType<typeof buildDashboardKpis>;
+  reportRowCount: number;
+  dashboardFilterLabel: string;
 }) {
   const {
     periodType,
@@ -497,7 +537,16 @@ function ReportFormBody(props: {
     progress,
     progressLabel,
     lastReport,
+    liveKpis,
+    reportRowCount,
+    dashboardFilterLabel,
   } = props;
+
+  const fmt = (n: number) => {
+    if (n >= 1e9) return `${(n / 1e9).toFixed(2)}B`;
+    if (n >= 1e6) return `${(n / 1e6).toFixed(2)}M`;
+    return n.toLocaleString();
+  };
 
   return (
     <div className="space-y-4 px-6 py-3">
@@ -528,7 +577,12 @@ function ReportFormBody(props: {
             </button>
           ))}
         </div>
-        {periodType !== "custom" ? (
+        {periodType === "dashboard" ? (
+          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <CalendarRange className="size-3.5 shrink-0" />
+            <span>{dashboardFilterLabel}</span>
+          </p>
+        ) : periodType !== "custom" ? (
           <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <CalendarRange className="size-3.5 shrink-0" />
             <span>
@@ -550,6 +604,37 @@ function ReportFormBody(props: {
       ) : null}
 
       <Separator />
+
+      <section className="rounded-lg border border-primary/25 bg-primary/5 px-3 py-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+          Live preview (updates with filters)
+        </p>
+        {reportRowCount === 0 ? (
+          <p className="mt-2 text-sm text-destructive">
+            No rows match — adjust dashboard or report filters before generating.
+          </p>
+        ) : (
+          <div className="mt-2 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
+            <div className="rounded-md bg-background/80 px-2 py-1.5">
+              <p className="text-[0.65rem] text-muted-foreground">Budget</p>
+              <p className="font-semibold tabular-nums">{fmt(liveKpis.totalBudget)}</p>
+            </div>
+            <div className="rounded-md bg-background/80 px-2 py-1.5">
+              <p className="text-[0.65rem] text-muted-foreground">Expenditure</p>
+              <p className="font-semibold tabular-nums">{fmt(liveKpis.expenditure)}</p>
+            </div>
+            <div className="rounded-md bg-background/80 px-2 py-1.5">
+              <p className="text-[0.65rem] text-muted-foreground">Cost centers</p>
+              <p className="font-semibold tabular-nums">{liveKpis.costCenterCount}</p>
+            </div>
+            <div className="rounded-md bg-background/80 px-2 py-1.5">
+              <p className="text-[0.65rem] text-muted-foreground">Divisions</p>
+              <p className="font-semibold tabular-nums">{liveKpis.divisionCount}</p>
+            </div>
+          </div>
+        )}
+        <p className="mt-2 text-xs text-muted-foreground">{entryCountLabel}</p>
+      </section>
 
       <section className="rounded-lg border border-amber-200/70 bg-amber-50 px-3 py-2.5 dark:border-amber-500/30 dark:bg-amber-950/35">
         <p className="text-xs font-medium text-foreground">Cost center registry (system)</p>
