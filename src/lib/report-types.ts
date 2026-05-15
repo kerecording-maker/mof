@@ -1,4 +1,5 @@
 export type ReportPeriodType =
+  | "dashboard"
   | "quarterly"
   | "three_months"
   | "six_months"
@@ -25,6 +26,8 @@ export type ReportConfig = {
   sheetName: string;
   filters: ReportFilters;
   reportTitle: string;
+  /** When true, report uses dashboard-filtered rows and skips calendar year filtering. */
+  useDashboardView: boolean;
 };
 
 export type PeriodTotals = {
