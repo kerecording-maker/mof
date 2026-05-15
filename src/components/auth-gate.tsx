@@ -1,12 +1,20 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import type { User } from "firebase/auth";
 import { onAuthStateChanged } from "firebase/auth";
 import { Loader2, LogIn } from "lucide-react";
 import { toast } from "sonner";
 
-import { getFirebaseAuth, signInWithGoogle } from "@/lib/firebase";
+import {
+  getFirebaseAuth,
+  getAuthErrorMessage,
+  signInWithEmailPassword,
+  signInWithGoogle,
+} from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 /** Full-bleed login backdrop (override with `VITE_LOGIN_BG_URL` in `.env`). */
@@ -45,17 +53,41 @@ function AuthLoading() {
   );
 }
 
-function LoginScreen({ onGoogleSignIn }: { onGoogleSignIn: () => Promise<void> }) {
-  const [busy, setBusy] = useState(false);
+function LoginScreen({
+  onEmailSignIn,
+  onGoogleSignIn,
+}: {
+  onEmailSignIn: (email: string, password: string) => Promise<void>;
+  onGoogleSignIn: () => Promise<void>;
+}) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState<"email" | "google" | null>(null);
 
-  const handleSignIn = async () => {
-    setBusy(true);
+  const handleEmailSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!email.trim() || !password) {
+      toast.error("Enter your email and password.");
+      return;
+    }
+    setBusy("email");
+    try {
+      await onEmailSignIn(email, password);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleGoogle = async () => {
+    setBusy("google");
     try {
       await onGoogleSignIn();
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   };
+
+  const disabled = busy !== null;
 
   return (
     <div className="relative flex min-h-dvh flex-col overflow-hidden">
@@ -82,20 +114,68 @@ function LoginScreen({ onGoogleSignIn }: { onGoogleSignIn: () => Promise<void> }
           </CardHeader>
           <CardContent className="space-y-4 pb-8">
             <p className="text-center text-sm text-muted-foreground">
-              Sign in with your Google account to open the dashboard and tagging tools.
+              Sign in with your email and password, or use Google.
             </p>
+
+            <form onSubmit={handleEmailSubmit} className="space-y-3">
+              <div className="space-y-2">
+                <Label htmlFor="login-email">Email</Label>
+                <Input
+                  id="login-email"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={disabled}
+                  className="h-11 bg-background/80"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="login-password">Password</Label>
+                <Input
+                  id="login-password"
+                  type="password"
+                  autoComplete="current-password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={disabled}
+                  className="h-11 bg-background/80"
+                />
+              </div>
+              <Button
+                type="submit"
+                size="lg"
+                className="h-11 w-full gap-2 text-base shadow-md"
+                disabled={disabled}
+              >
+                {busy === "email" ? (
+                  <Loader2 className="size-5 animate-spin" aria-hidden />
+                ) : (
+                  <LogIn className="size-5" aria-hidden />
+                )}
+                Sign in
+              </Button>
+            </form>
+
+            <div className="flex items-center gap-3">
+              <Separator className="flex-1" />
+              <span className="text-xs uppercase tracking-wide text-muted-foreground">or</span>
+              <Separator className="flex-1" />
+            </div>
+
             <Button
               type="button"
+              variant="outline"
               size="lg"
-              className="h-12 w-full gap-2 text-base shadow-md"
-              onClick={handleSignIn}
-              disabled={busy}
+              className="h-11 w-full gap-2 text-base"
+              onClick={() => void handleGoogle()}
+              disabled={disabled}
             >
-              {busy ? (
+              {busy === "google" ? (
                 <Loader2 className="size-5 animate-spin" aria-hidden />
-              ) : (
-                <LogIn className="size-5" aria-hidden />
-              )}
+              ) : null}
               Continue with Google
             </Button>
           </CardContent>
@@ -118,15 +198,23 @@ export function AuthGate({ children }: { children: ReactNode }) {
     return () => unsub();
   }, []);
 
-  const signIn = async () => {
+  const signInEmail = async (email: string, password: string) => {
+    try {
+      await signInWithEmailPassword(email, password);
+      toast.success("Signed in successfully");
+    } catch (e) {
+      console.error(e);
+      toast.error(getAuthErrorMessage(e));
+    }
+  };
+
+  const signInGoogle = async () => {
     try {
       await signInWithGoogle();
       toast.success("Signed in with Google");
     } catch (e) {
       console.error(e);
-      toast.error(
-        "Google sign-in failed. Check Firebase Auth settings (Google provider, authorized domains).",
-      );
+      toast.error(getAuthErrorMessage(e));
     }
   };
 
@@ -135,7 +223,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   }
 
   if (!user) {
-    return <LoginScreen onGoogleSignIn={signIn} />;
+    return <LoginScreen onEmailSignIn={signInEmail} onGoogleSignIn={signInGoogle} />;
   }
 
   return children;
